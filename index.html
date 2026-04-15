@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat App</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <style>
+        :root { --bg-color: #74bad4; --header-color: #2c3e50; --msg-me: #85e249; --msg-other: #ffffff; }
+        body { font-family: sans-serif; margin: 0; background: #f0f2f5; display: flex; justify-content: center; align-items: center; height: 100vh; }
+        #app { width: 100%; max-width: 400px; height: 90vh; background: white; border-radius: 12px; overflow: hidden; display: flex; flex-direction: column; box-shadow: 0 10px 25px rgba(0,0,0,0.1); }
+        .screen { display: none; padding: 20px; flex-direction: column; height: 100%; box-sizing: border-box; }
+        .active { display: flex; }
+        button { padding: 12px; border: none; border-radius: 8px; background: var(--header-color); color: white; cursor: pointer; margin-top: 10px; }
+        .icon-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin: 10px 0; }
+        .icon-item { font-size: 24px; text-align: center; padding: 8px; border: 2px solid #eee; border-radius: 8px; cursor: pointer; }
+        .icon-item.selected { border-color: var(--header-color); background: #f0f0f0; }
+        input { padding: 12px; border: 1px solid #ddd; border-radius: 8px; margin-bottom: 5px; }
+        .chat-header { background: var(--header-color); color: white; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }
+        .chat-messages { flex: 1; background: var(--bg-color); padding: 15px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 75%; padding: 8px 12px; border-radius: 15px; font-size: 14px; }
+        .msg.me { align-self: flex-end; background: var(--msg-me); }
+        .msg.other { align-self: flex-start; background: var(--msg-other); }
+        .msg-info { font-size: 10px; color: #555; margin-bottom: 2px; }
+        .msg-sys { align-self: center; background: rgba(0,0,0,0.2); color: white; padding: 4px 12px; border-radius: 10px; font-size: 11px; }
+        .chat-input-area { display: flex; padding: 10px; border-top: 1px solid #ddd; }
+        .chat-input-area input { flex: 1; margin-right: 10px; }
+    </style>
+</head>
+<body>
+<div id="app">
+    <div id="screen-main" class="screen active">
+        <h2 style="text-align:center">らいのチャット</h2>
+        <button onclick="goToProfile('create')">ルームを作成</button>
+        <button onclick="goToProfile('join')">ルームに参加</button>
+    </div>
+
+    <div id="screen-profile" class="screen">
+        <h3>プロフィール設定</h3>
+        <input type="text" id="nickname" placeholder="ニックネーム">
+        <div class="icon-grid" id="icon-grid"></div>
+        <button onclick="handleProfileNext()">次へ</button>
+    </div>
+
+    <div id="screen-create-type" class="screen">
+        <h3>作成方法</h3>
+        <button onclick="createRoom('')">ランダムな番号で作る</button>
+        <p style="text-align:center; margin:15px 0; color:#666;">または</p>
+        <input type="text" id="custom-room-id" placeholder="好きな合言葉を入力">
+        <button onclick="createWithId()">合言葉で作る</button>
+    </div>
+
+    <div id="screen-room-input" class="screen">
+        <h3>参加する</h3>
+        <input type="text" id="room-id-input" placeholder="番号または合言葉">
+        <button onclick="joinRoom()">参加する</button>
+    </div>
+
+    <div id="screen-chat" class="screen" style="padding:0">
+        <div class="chat-header">
+            <span id="chat-room-display">ID: ----</span>
+            <button onclick="exitAction()" style="background:#e74c3c; font-size:12px; padding:5px 10px;" id="exit-btn"></button>
+        </div>
+        <div class="chat-messages" id="chat-messages"></div>
+        <div class="chat-input-area">
+            <input type="text" id="message-input" placeholder="メッセージ...">
+            <button onclick="sendMessage()">送信</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const socket = io();
+    let mode = '', selectedIcon = '', myData = { nickname: '', icon: '', roomId: '', isOwner: false };
+    const icons = ["😊", "🐱", "🐶", "🦊", "🐻", "🐯", "🤖", "👻", "⭐", "🍀", "🎨", "🎮", "⚽", "🍎", "🚀", "💎"];
+
+    const iconGrid = document.getElementById('icon-grid');
+    icons.forEach(icon => {
+        const div = document.createElement('div');
+        div.className = 'icon-item';
+        div.innerText = icon;
+        div.onclick = () => {
+            document.querySelectorAll('.icon-item').forEach(el => el.classList.remove('selected'));
+            div.classList.add('selected');
+            selectedIcon = icon;
+        };
+        iconGrid.appendChild(div);
+    });
+
+    function showScreen(id) {
+        document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+    }
+
+    function goToProfile(m) {
+        mode = m;
+        showScreen('screen-profile');
+    }
+
+    function handleProfileNext() {
+        myData.nickname = document.getElementById('nickname').value;
+        myData.icon = selectedIcon;
+        if (!myData.nickname || !selectedIcon) return alert("ニックネームとアイコンを選んでね");
+        
+        if (mode === 'create') {
+            showScreen('screen-create-type');
+        } else {
+            showScreen('screen-room-input');
+        }
+    }
+
+    function createWithId() {
+        const val = document.getElementById('custom-room-id').value;
+        if (!val) return alert("合言葉を入力してね");
+        createRoom(val);
+    }
+
+    function createRoom(customId) {
+        socket.emit('create-room', customId, (res) => {
+            if (res.success) {
+                myData.roomId = res.roomId;
+                myData.isOwner = true;
+                startChat();
+            } else {
+                alert(res.message);
+            }
+        });
+    }
+
+    function joinRoom() {
+        const id = document.getElementById('room-id-input').value;
+        if (!id) return alert("番号か合言葉を入力してね");
+        socket.emit('join-room', { roomId: id, nickname: myData.nickname }, (res) => {
+            if (res.success) {
+                myData.roomId = id;
+                myData.isOwner = false;
+                startChat();
+            } else {
+                alert(res.message);
+            }
+        });
+    }
+
+    function startChat() {
+        document.getElementById('chat-room-display').innerText = `ID: ${myData.roomId}`;
+        document.getElementById('exit-btn').innerText = myData.isOwner ? "終わり" : "閉じる";
+        showScreen('screen-chat');
+        addSysMessage("入室しました");
+    }
+
+    function exitAction() {
+        if (myData.isOwner) socket.emit('terminate-room', myData.roomId);
+        location.reload();
+    }
+
+    function sendMessage() {
+        const input = document.getElementById('message-input');
+        if (!input.value) return;
+        socket.emit('send-message', {
+            roomId: myData.roomId,
+            nickname: myData.nickname,
+            icon: myData.icon,
+            text: input.value,
+            senderId: socket.id
+        });
+        input.value = '';
+    }
+
+    function addSysMessage(txt) {
+        const container = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        div.className = 'msg-sys';
+        div.innerText = txt;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+
+    socket.on('receive-message', (data) => {
+        const container = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        const side = data.senderId === socket.id ? 'me' : 'other';
+        div.className = `msg ${side}`;
+        div.innerHTML = `<div class="msg-info">${data.icon} ${data.nickname}</div><div>${data.text}</div>`;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    });
+
+    socket.on('sys-message', (txt) => addSysMessage(txt));
+
+    socket.on('room-terminated', () => {
+        alert("ルームが終了されました");
+        location.reload();
+    });
+</script>
+</body>
+</html>
