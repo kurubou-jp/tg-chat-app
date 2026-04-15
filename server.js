@@ -1,25 +1,30 @@
 const express = require('express');
 const app = express();
 const http = require('http').createServer(app);
-const io = require('socket.io')(http);
+const io = require('socket.io')(http, {
+    cors: {
+        origin: "*", // どこからでも接続できるようにする設定
+        methods: ["GET", "POST"]
+    }
+});
 
 const rooms = {};
 
 app.use(express.static(__dirname));
 
 io.on('connection', (socket) => {
-    // ルーム作成
+    // ルーム作成（合言葉対応）
     socket.on('create-room', (customId, callback) => {
         let roomId = customId;
         
-        // 合言葉が空なら4桁の番号を生成
+        // 合言葉が空なら4桁のランダム番号を生成
         if (!roomId) {
             do {
                 roomId = Math.floor(1000 + Math.random() * 9000).toString();
             } while (rooms[roomId]);
         }
 
-        // すでに使われている合言葉ならエラーを返す
+        // すでに使われている合言葉ならエラー
         if (rooms[roomId]) {
             if (typeof callback === 'function') {
                 callback({ success: false, message: "その合言葉はすでに使われています" });
@@ -27,11 +32,10 @@ io.on('connection', (socket) => {
             return;
         }
 
-        // ルーム情報を初期化
+        // ルーム作成
         rooms[roomId] = { owner: socket.id, status: 'active' };
         socket.join(roomId);
 
-        // クライアントへ成功を通知
         if (typeof callback === 'function') {
             callback({ success: true, roomId: roomId });
         }
@@ -40,9 +44,10 @@ io.on('connection', (socket) => {
     // ルーム参加
     socket.on('join-room', (data, callback) => {
         const { roomId, nickname } = data;
+        
         if (rooms[roomId] && rooms[roomId].status === 'active') {
             socket.join(roomId);
-            // 入室したことをルーム内の全員に通知
+            // 入室メッセージを全員に送る
             io.to(roomId).emit('sys-message', `${nickname} が入室しました`);
             
             if (typeof callback === 'function') {
@@ -57,11 +62,11 @@ io.on('connection', (socket) => {
 
     // メッセージの送受信
     socket.on('send-message', (data) => {
-        // 全員（自分含む）にメッセージを転送
+        // 全員にメッセージを転送
         io.to(data.roomId).emit('receive-message', data);
     });
 
-    // ルームの終了（作成者のみ）
+    // ルーム終了（ホストが退出した時など）
     socket.on('terminate-room', (roomId) => {
         if (rooms[roomId] && rooms[roomId].owner === socket.id) {
             rooms[roomId].status = 'terminated';
@@ -69,12 +74,15 @@ io.on('connection', (socket) => {
             delete rooms[roomId];
         }
     });
+
+    // 接続が切れた時の処理（予期せぬ切断対策）
+    socket.on('disconnect', () => {
+        // 誰が切れたか特定してルームを掃除する処理をここに追加もできる
+    });
 });
 
-// 公開サーバー用設定：process.env.PORTがあればそれを使い、なければ3000を使う
+// ポート設定（Renderなどの公開サーバー用）
 const PORT = process.env.PORT || 3000;
-
-// '0.0.0.0' を指定することで外部からの接続を待ち受ける
 http.listen(PORT, '0.0.0.0', () => {
-    console.log(`サーバー起動完了！ ポート: ${PORT}`);
+    console.log(`Server is running on port ${PORT}`);
 });
