@@ -3,163 +3,205 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>らいのチャット</title>
+    <title>RAI Chat | Next Gen</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        :root { --bg-color: #74bad4; --header-color: #2c3e50; --msg-me: #85e249; --msg-other: #ffffff; }
-        
-        /* 全体設定 */
-        body { 
-            font-family: sans-serif; 
-            margin: 0; 
-            background: #f0f2f5; 
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
+        :root {
+            --primary: #6366f1;
+            --secondary: #a855f7;
+            --bg-dark: #0f172a;
+            --glass: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --text: #f8fafc;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, sans-serif;
+            margin: 0;
+            background: radial-gradient(circle at top right, #1e1b4b, var(--bg-dark));
+            color: var(--text);
             height: 100vh;
-            overflow: hidden; /* 画面の揺れ防止 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
         }
 
-        #app { 
-            width: 100%; 
-            max-width: 450px; 
-            height: 100%; 
-            background: white; 
-            display: flex; 
-            flex-direction: column; 
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+        #app {
+            width: 100%;
+            max-width: 480px;
+            height: 90vh;
+            background: var(--glass);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--glass-border);
+            border-radius: 24px;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            position: relative;
         }
 
-        /* 画面切り替え */
-        .screen { display: none; padding: 20px; flex-direction: column; height: 100%; box-sizing: border-box; }
-        .active { display: flex; }
+        .screen { display: none; padding: 30px; flex-direction: column; height: 100%; box-sizing: border-box; }
+        .active { display: flex; animation: fadeIn 0.4s ease-out; }
 
-        /* ボタン（iPad/スマホ対応） */
-        button { 
-            padding: 15px; 
-            border: none; 
-            border-radius: 12px; 
-            background: var(--header-color); 
-            color: white; 
-            cursor: pointer; 
-            margin-top: 10px; 
-            font-weight: bold; 
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        h1, h3 { text-align: center; background: linear-gradient(to right, #818cf8, #c084fc); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+
+        input {
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid var(--glass-border);
+            border-radius: 12px;
+            padding: 16px;
+            color: white;
             font-size: 16px;
-            touch-action: manipulation; /* iPadの反応を速くする */
-            -webkit-tap-highlight-color: transparent;
+            margin-bottom: 12px;
+            transition: 0.3s;
         }
-        button:active { opacity: 0.7; }
+        input:focus { border-color: var(--primary); outline: none; background: rgba(255, 255, 255, 0.12); }
 
-        /* アイコン選択 */
-        .icon-grid { 
-            display: grid; 
-            grid-template-columns: repeat(5, 1fr); 
-            gap: 10px; 
-            margin: 15px 0; 
-            overflow-y: auto; 
-            max-height: 180px;
-            padding: 5px;
+        button {
+            background: linear-gradient(135deg, var(--primary), var(--secondary));
+            border: none;
+            border-radius: 12px;
+            padding: 16px;
+            color: white;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            transition: 0.2s;
+            margin-top: 8px;
+            touch-action: manipulation;
         }
-        .icon-item { 
-            font-size: 28px; 
-            text-align: center; 
-            padding: 8px; 
-            border: 2px solid #eee; 
-            border-radius: 10px; 
-            cursor: pointer; 
-        }
-        .icon-item.selected { border-color: #3498db; background: #ebf5fb; }
+        button:active { transform: scale(0.96); opacity: 0.9; }
 
-        input { 
-            padding: 15px; 
-            border: 1px solid #ddd; 
-            border-radius: 10px; 
-            margin-bottom: 10px; 
-            font-size: 16px; 
-            outline: none;
+        .icon-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 12px;
+            margin: 20px 0;
+            padding: 10px;
+            overflow-y: auto;
+            background: rgba(0,0,0,0.2);
+            border-radius: 16px;
         }
-
-        /* チャットエリア */
-        .chat-header { background: var(--header-color); color: white; padding: 10px 15px; display: flex; justify-content: space-between; align-items: center; }
-        .chat-messages { 
-            flex: 1; 
-            background: var(--bg-color); 
-            padding: 15px; 
-            overflow-y: auto; 
-            display: flex; 
-            flex-direction: column; 
-            gap: 12px; 
-            -webkit-overflow-scrolling: touch; /* iOSのスクロールを滑らかに */
+        .icon-item {
+            font-size: 24px;
+            padding: 10px;
+            text-align: center;
+            border-radius: 12px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: 0.2s;
         }
-        
-        /* 吹き出し */
-        .msg { max-width: 80%; padding: 10px 14px; border-radius: 18px; font-size: 15px; line-height: 1.4; position: relative; word-wrap: break-word; }
-        .msg.me { align-self: flex-end; background: var(--msg-me); border-bottom-right-radius: 2px; }
-        .msg.other { align-self: flex-start; background: var(--msg-other); border-bottom-left-radius: 2px; }
-        .msg-info { font-size: 11px; color: rgba(0,0,0,0.6); margin-bottom: 3px; font-weight: bold; }
-        .msg-sys { align-self: center; background: rgba(0,0,0,0.15); color: white; padding: 5px 15px; border-radius: 20px; font-size: 12px; margin: 5px 0; }
+        .icon-item:hover { background: rgba(255,255,255,0.05); }
+        .icon-item.selected { border-color: var(--primary); background: rgba(99, 102, 241, 0.2); }
 
-        .chat-input-area { display: flex; padding: 15px; border-top: 1px solid #ddd; background: #fff; }
-        .chat-input-area input { flex: 1; margin-right: 10px; margin-bottom: 0; }
+        /* Chat UI */
+        .chat-header {
+            padding: 15px 25px;
+            background: rgba(255,255,255,0.03);
+            border-bottom: 1px solid var(--glass-border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .msg {
+            max-width: 80%;
+            padding: 12px 16px;
+            border-radius: 20px;
+            font-size: 15px;
+            position: relative;
+            backdrop-filter: blur(5px);
+        }
+        .msg.me {
+            align-self: flex-end;
+            background: linear-gradient(135deg, var(--primary), #4f46e5);
+            color: white;
+            border-bottom-right-radius: 4px;
+        }
+        .msg.other {
+            align-self: flex-start;
+            background: rgba(255,255,255,0.1);
+            color: white;
+            border-bottom-left-radius: 4px;
+            border: 1px solid var(--glass-border);
+        }
+        .msg-info { font-size: 11px; opacity: 0.7; margin-bottom: 4px; }
+        .msg-sys { align-self: center; font-size: 11px; opacity: 0.5; background: rgba(255,255,255,0.1); padding: 4px 12px; border-radius: 10px; }
+
+        .chat-input-area {
+            padding: 20px;
+            display: flex;
+            gap: 10px;
+            background: rgba(15, 23, 42, 0.8);
+        }
+        .chat-input-area input { flex: 1; margin-bottom: 0; border-radius: 25px; }
+        .chat-input-area button { border-radius: 50%; width: 50px; height: 50px; padding: 0; display: flex; justify-content: center; align-items: center; margin-top: 0; }
     </style>
 </head>
 <body>
+
 <div id="app">
     <div id="screen-main" class="screen active">
-        <h1 style="text-align:center; color: var(--header-color);">らいのチャット</h1>
-        <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
-            <button onclick="goToProfile('create')">新しくルームを作る</button>
-            <button onclick="goToProfile('join')">合言葉で参加する</button>
+        <h1>RAI CHAT</h1>
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:15px;">
+            <button onclick="goToProfile('create')">CREATE ROOM</button>
+            <button onclick="goToProfile('join')">JOIN ROOM</button>
         </div>
     </div>
 
     <div id="screen-profile" class="screen">
-        <h3>プロフィール設定</h3>
-        <input type="text" id="nickname" placeholder="ニックネームを入力" maxlength="10">
-        <p style="font-size:14px; color:#666;">アイコンを選んでね</p>
+        <h3>WHO ARE YOU?</h3>
+        <input type="text" id="nickname" placeholder="Nickname" maxlength="12">
         <div class="icon-grid" id="icon-grid"></div>
-        <button onclick="handleProfileNext()">次へ進む</button>
+        <button onclick="handleProfileNext()">NEXT STEP</button>
     </div>
 
     <div id="screen-create-type" class="screen">
-        <h3>ルーム作成</h3>
-        <input type="text" id="custom-room-id" placeholder="好きな合言葉（空ならランダム）">
-        <button onclick="createWithId()">この合言葉で作る</button>
-        <button onclick="showScreen('screen-main')" style="background:#95a5a6;">戻る</button>
+        <h3>ROOM SETTING</h3>
+        <input type="text" id="custom-room-id" placeholder="Room ID (Optional)">
+        <button onclick="createWithId()">START SERVER</button>
+        <button onclick="showScreen('screen-main')" style="background:none; border: 1px solid var(--glass-border);">BACK</button>
     </div>
 
     <div id="screen-room-input" class="screen">
-        <h3>参加する</h3>
-        <input type="text" id="room-id-input" placeholder="合言葉を入力">
-        <button onclick="joinRoom()">入室する</button>
-        <button onclick="showScreen('screen-main')" style="background:#95a5a6;">戻る</button>
+        <h3>ENTER ID</h3>
+        <input type="text" id="room-id-input" placeholder="Room ID">
+        <button onclick="joinRoom()">JOIN NOW</button>
+        <button onclick="showScreen('screen-main')" style="background:none; border: 1px solid var(--glass-border);">BACK</button>
     </div>
 
     <div id="screen-chat" class="screen" style="padding:0">
         <div class="chat-header">
-            <strong id="chat-room-display">ID: ----</strong>
-            <button onclick="exitAction()" style="background:#e74c3c; font-size:12px; padding:6px 12px; margin-top:0;" id="exit-btn">退出</button>
+            <span id="chat-room-display" style="font-weight:bold; color:var(--primary)">ID: ---</span>
+            <button onclick="exitAction()" style="background:#ef4444; padding:6px 15px; font-size:12px; margin:0;" id="exit-btn">EXIT</button>
         </div>
         <div class="chat-messages" id="chat-messages"></div>
         <form class="chat-input-area" onsubmit="sendMessage(); return false;">
-            <input type="text" id="message-input" placeholder="メッセージ..." autocomplete="off">
-            <button type="submit">送信</button>
+            <input type="text" id="message-input" placeholder="Type a message..." autocomplete="off">
+            <button type="submit">▶</button>
         </form>
     </div>
 </div>
 
 <script>
-    // Socket.io 接続設定（iPad/iPhoneの切断対策）
     const socket = io({
         transports: ['websocket', 'polling'],
-        reconnectionAttempts: 10,
-        timeout: 10000
+        reconnectionAttempts: 10
     });
 
     let mode = '', selectedIcon = '', myData = { nickname: '', icon: '', roomId: '', isOwner: false };
-    const icons = ["😊", "🐱", "🐶", "🦊", "🐻", "🐯", "🤖", "👻", "⭐", "🍀", "🎨", "🎮", "⚽", "🍎", "🚀", "💎", "🐳", "🍕", "🌈", "🔥"];
+    const icons = ["👤", "😎", "👾", "🐱", "🦊", "🐯", "🤖", "👻", "⭐", "🎨", "🎮", "⚽", "🚀", "💎", "🐳", "🍕", "🌈", "🔥", "🪐", "⚡"];
 
-    // アイコン一覧の作成
     const iconGrid = document.getElementById('icon-grid');
     icons.forEach(icon => {
         const div = document.createElement('div');
@@ -183,7 +225,7 @@
     function handleProfileNext() {
         myData.nickname = document.getElementById('nickname').value.trim();
         myData.icon = selectedIcon;
-        if (!myData.nickname || !selectedIcon) return alert("名前とアイコンを選んでね！");
+        if (!myData.nickname || !selectedIcon) return alert("Enter nickname & Choose icon");
         if (mode === 'create') showScreen('screen-create-type');
         else showScreen('screen-room-input');
     }
@@ -201,7 +243,7 @@
 
     function joinRoom() {
         const id = document.getElementById('room-id-input').value.trim();
-        if (!id) return alert("合言葉を入れてね");
+        if (!id) return alert("Enter Room ID");
         socket.emit('join-room', { roomId: id, nickname: myData.nickname }, (res) => {
             if (res.success) {
                 myData.roomId = id;
@@ -212,16 +254,14 @@
     }
 
     function startChat() {
-        document.getElementById('chat-room-display').innerText = `合言葉: ${myData.roomId}`;
-        document.getElementById('exit-btn').innerText = myData.isOwner ? "解散" : "退出";
+        document.getElementById('chat-room-display').innerText = `ID: ${myData.roomId}`;
+        document.getElementById('exit-btn').innerText = myData.isOwner ? "CLOSE" : "EXIT";
         showScreen('screen-chat');
     }
 
     function exitAction() {
-        if (myData.isOwner) {
-            if (!confirm("ルームを解散しますか？")) return;
-            socket.emit('terminate-room', myData.roomId);
-        }
+        if (myData.isOwner && !confirm("Close this room?")) return;
+        if (myData.isOwner) socket.emit('terminate-room', myData.roomId);
         location.reload();
     }
 
@@ -236,10 +276,8 @@
             senderId: socket.id
         });
         input.value = '';
-        input.focus();
     }
 
-    // メッセージ受信
     socket.on('receive-message', (data) => {
         const container = document.getElementById('chat-messages');
         const div = document.createElement('div');
@@ -259,10 +297,7 @@
         container.scrollTop = container.scrollHeight;
     });
 
-    socket.on('room-terminated', () => {
-        alert("ルームが終了されました");
-        location.reload();
-    });
+    socket.on('room-terminated', () => { alert("Room Closed"); location.reload(); });
 </script>
 </body>
 </html>
