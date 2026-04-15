@@ -2,76 +2,78 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>RAI Chat Simple</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>RAI Chat LINE</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
-        /* モダンな白基調のデザイン */
         :root {
-            --bg: #f8f9fa;
-            --card: #ffffff;
-            --primary: #007aff; /* Apple風のブルー */
-            --text: #1d1d1f;
+            --line-bg: #74bad4;
+            --line-green: #85e249;
+            --white: #ffffff;
+            --text-dark: #1d1d1f;
             --border: #e5e5e7;
-            --msg-me: #007aff;
-            --msg-other: #e9e9eb;
+        }
+
+        /* iPadのタッチ操作を安定させる設定 */
+        * {
+            touch-action: manipulation;
+            -webkit-tap-highlight-color: transparent;
+            box-sizing: border-box;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
             margin: 0;
-            background-color: var(--bg);
-            color: var(--text);
+            background-color: #f0f0f0;
             height: 100vh;
             display: flex;
             justify-content: center;
-            align-items: center;
             overflow: hidden;
-            -webkit-text-size-adjust: 100%;
+            position: fixed; /* iOSでのスクロールバグを防止 */
+            width: 100%;
         }
 
         #app {
             width: 100%;
             max-width: 500px;
-            height: 100dvh;
-            background-color: var(--card);
+            height: 100%;
+            background-color: var(--white);
             display: flex;
             flex-direction: column;
-            position: relative;
-            box-shadow: 0 0 20px rgba(0,0,0,0.05);
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
         }
 
-        .screen { display: none; padding: 24px; flex-direction: column; height: 100%; box-sizing: border-box; }
+        .screen { display: none; padding: 20px; flex-direction: column; height: 100%; }
         .active { display: flex; }
 
-        h1 { font-size: 24px; font-weight: 700; text-align: center; margin-bottom: 30px; }
+        h2 { text-align: center; color: var(--text-dark); margin-top: 40px; }
 
-        /* iPadで確実に押せるボタン設定 */
+        /* iPadでも確実に反応するボタン */
         button {
-            background-color: var(--primary);
-            color: white;
-            border: none;
-            border-radius: 12px;
             padding: 16px;
+            border: none;
+            border-radius: 8px;
+            background-color: #2c3e50;
+            color: white;
             font-size: 16px;
-            font-weight: 600;
+            font-weight: bold;
             cursor: pointer;
             margin-bottom: 12px;
-            transition: opacity 0.2s;
-            touch-action: manipulation; /* iPadの遅延防止 */
             -webkit-appearance: none;
+            display: block;
+            width: 100%;
         }
-        button:active { opacity: 0.7; }
-        .btn-sub { background-color: var(--border); color: var(--text); }
+
+        button:active { opacity: 0.6; background-color: #000; }
 
         input {
-            background-color: #f2f2f7;
+            padding: 16px;
             border: 1px solid var(--border);
-            border-radius: 12px;
-            padding: 14px;
+            border-radius: 8px;
             font-size: 16px;
-            margin-bottom: 16px;
-            outline: none;
+            margin-bottom: 12px;
+            background: #f8f9fa;
+            width: 100%;
             -webkit-appearance: none;
         }
 
@@ -79,89 +81,108 @@
         .icon-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
-            gap: 12px;
+            gap: 10px;
             margin: 20px 0;
             overflow-y: auto;
+            max-height: 200px;
         }
         .icon-item {
-            font-size: 24px;
-            padding: 10px;
+            font-size: 28px;
             text-align: center;
-            border-radius: 12px;
+            padding: 10px;
             border: 2px solid transparent;
+            border-radius: 12px;
             background: #f2f2f7;
         }
-        .icon-item.selected { border-color: var(--primary); background: #e1f0ff; }
+        .icon-item.selected { border: 2px solid #007aff; background: #e1f0ff; }
 
-        /* チャット画面 */
+        /* チャット画面 (LINE風) */
         .chat-header {
-            padding: 12px 20px;
-            border-bottom: 1px solid var(--border);
+            padding: 10px 15px;
+            background: #2c3e50;
+            color: white;
             display: flex;
             justify-content: space-between;
             align-items: center;
-            background: white;
+            font-weight: bold;
         }
+        
         .chat-messages {
             flex: 1;
-            padding: 20px;
+            background-color: var(--line-bg);
+            padding: 15px;
             overflow-y: auto;
-            background-color: white;
             display: flex;
             flex-direction: column;
-            gap: 12px;
+            gap: 15px;
             -webkit-overflow-scrolling: touch;
         }
 
+        /* LINE風吹き出し */
         .msg {
-            max-width: 75%;
+            max-width: 80%;
             padding: 10px 14px;
-            border-radius: 18px;
+            border-radius: 15px;
             font-size: 15px;
+            position: relative;
             line-height: 1.4;
         }
-        .msg.me { align-self: flex-end; background-color: var(--msg-me); color: white; }
-        .msg.other { align-self: flex-start; background-color: var(--msg-other); color: black; }
-        .msg-info { font-size: 11px; margin-bottom: 2px; opacity: 0.6; }
+        .msg.me {
+            align-self: flex-end;
+            background-color: var(--line-green);
+            color: #000;
+            border-top-right-radius: 2px;
+        }
+        .msg.other {
+            align-self: flex-start;
+            background-color: var(--white);
+            color: #000;
+            border-top-left-radius: 2px;
+        }
+        .msg-info { font-size: 11px; margin-bottom: 3px; color: rgba(0,0,0,0.6); }
 
         .chat-input-area {
-            padding: 16px;
+            padding: 10px;
+            background: #ffffff;
             border-top: 1px solid var(--border);
             display: flex;
-            gap: 10px;
-            background: white;
+            gap: 8px;
+            padding-bottom: env(safe-area-inset-bottom); /* iPhone/iPadのバー対策 */
         }
-        .chat-input-area input { flex: 1; margin-bottom: 0; border-radius: 20px; }
-        .chat-input-area button { margin-bottom: 0; padding: 10px 20px; border-radius: 20px; }
+        .chat-input-area input { flex: 1; margin-bottom: 0; border-radius: 25px; padding: 10px 15px; }
+        .chat-input-area button { width: auto; margin-bottom: 0; padding: 0 20px; border-radius: 25px; background: #007aff; }
+
     </style>
 </head>
 <body>
 
 <div id="app">
     <div id="screen-main" class="screen active">
-        <h1>らいのチャット</h1>
-        <button onclick="goToProfile('create')">新しく作る</button>
-        <button onclick="goToProfile('join')" class="btn-sub">合言葉で入る</button>
+        <h2>らいのチャット</h2>
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
+            <button onclick="goToProfile('create')">新しく作る</button>
+            <button onclick="goToProfile('join')" style="background:#7f8c8d;">合言葉で入る</button>
+        </div>
     </div>
 
     <div id="screen-profile" class="screen">
         <h3>プロフィール</h3>
-        <input type="text" id="nickname" placeholder="ニックネーム" maxlength="12">
+        <input type="text" id="nickname" placeholder="ニックネーム" maxlength="10">
         <div class="icon-grid" id="icon-grid"></div>
         <button onclick="handleProfileNext()">次へ</button>
     </div>
 
     <div id="screen-input" class="screen">
-        <h3 id="input-title">設定</h3>
-        <input type="text" id="room-id-input" placeholder="合言葉（例：ひみつ）">
+        <h3 id="input-title">ルーム設定</h3>
+        <input type="text" id="room-id-input" placeholder="合言葉を決めてね">
         <button onclick="handleRoomAction()" id="room-action-btn">決定</button>
-        <button onclick="showScreen('screen-main')" class="btn-sub">戻る</button>
+        <button onclick="showScreen('screen-main')" style="background:#95a5a6;">戻る</button>
     </div>
 
     <div id="screen-chat" class="screen" style="padding:0">
         <div class="chat-header">
-            <span id="chat-room-display" style="font-weight:600">ID: ---</span>
-            <button onclick="exitAction()" style="background:#ff3b30; padding:6px 12px; font-size:12px; margin:0;">終了</button>
+            <span id="chat-room-display">ID: ---</span>
+            <button onclick="exitAction()" style="background:#e74c3c; padding:5px 10px; font-size:12px; margin:0;">終了</button>
         </div>
         <div class="chat-messages" id="chat-messages"></div>
         <form class="chat-input-area" onsubmit="sendMessage(); return false;">
@@ -174,22 +195,22 @@
 <script>
     const socket = io({
         transports: ['websocket', 'polling'],
-        reconnectionAttempts: 10
+        reconnection: true
     });
 
     let mode = '', selectedIcon = '', myData = { nickname: '', icon: '', roomId: '', isOwner: false };
-    const icons = ["👤", "🐱", "🐶", "🦊", "🐻", "🐯", "🤖", "👻", "⭐", "🎨", "🎮", "⚽", "🚀", "💎", "🐳", "🍕", "🌈", "🔥", "🪐", "⚡"];
+    const icons = ["😊", "🐱", "🐶", "🦊", "🐻", "🐯", "🤖", "👻", "⭐", "🍀", "🎨", "🎮", "⚽", "🍎", "🚀", "💎", "🐳", "🍕", "🌈", "🔥"];
 
     const iconGrid = document.getElementById('icon-grid');
     icons.forEach(icon => {
         const div = document.createElement('div');
         div.className = 'icon-item';
         div.innerText = icon;
-        div.onclick = () => {
+        div.addEventListener('click', () => {
             document.querySelectorAll('.icon-item').forEach(el => el.classList.remove('selected'));
             div.classList.add('selected');
             selectedIcon = icon;
-        };
+        });
         iconGrid.appendChild(div);
     });
 
@@ -206,7 +227,7 @@
     function handleProfileNext() {
         myData.nickname = document.getElementById('nickname').value.trim();
         myData.icon = selectedIcon;
-        if (!myData.nickname || !selectedIcon) return alert("名前とアイコンを選んでな！");
+        if (!myData.nickname || !selectedIcon) return alert("名前とアイコンを選んでね！");
         
         document.getElementById('input-title').innerText = (mode === 'create') ? "ルーム作成" : "ルーム参加";
         document.getElementById('room-action-btn').innerText = (mode === 'create') ? "作成して開始" : "入室する";
@@ -221,7 +242,7 @@
                 else alert(res.message);
             });
         } else {
-            if (!id) return alert("合言葉を入れてな！");
+            if (!id) return alert("合言葉を入れてね！");
             socket.emit('join-room', { roomId: id, nickname: myData.nickname }, (res) => {
                 if (res.success) { myData.roomId = id; myData.isOwner = false; startChat(); }
                 else alert(res.message);
@@ -250,6 +271,7 @@
             senderId: socket.id
         });
         input.value = '';
+        input.focus(); // iPadでキーボードを閉じさせない
     }
 
     socket.on('receive-message', (data) => {
@@ -262,7 +284,17 @@
         container.scrollTop = container.scrollHeight;
     });
 
-    socket.on('room-terminated', () => { alert("終了しました"); location.reload(); });
+    socket.on('sys-message', (txt) => {
+        const container = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        div.className = 'msg-sys';
+        div.style = "align-self:center; font-size:12px; color:white; background:rgba(0,0,0,0.2); padding:2px 10px; border-radius:10px; margin:5px 0;";
+        div.innerText = txt;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    });
+
+    socket.on('room-terminated', () => { alert("ルームが終了しました"); location.reload(); });
 </script>
 </body>
 </html>
