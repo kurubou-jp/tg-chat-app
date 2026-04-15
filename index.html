@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>RAI Chat LINE</title>
+    <title>Chat LINE</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root {
@@ -46,15 +46,13 @@
         .screen { display: none; padding: 20px; flex-direction: column; height: 100%; }
         .active { display: flex; }
 
-        h2 { text-align: center; color: var(--text-dark); margin-top: 40px; }
+        h2, h3 { text-align: center; color: var(--text-dark); margin-top: 20px; }
 
-        /* iPadでも確実に反応するボタン */
+        /* ★iPadで絶対に反応させるボタン設定★ */
         button {
             padding: 16px;
             border: none;
             border-radius: 8px;
-            background-color: #2c3e50;
-            color: white;
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
@@ -62,9 +60,18 @@
             -webkit-appearance: none;
             display: block;
             width: 100%;
+            position: relative; /* タップ領域を一番前にする */
+            z-index: 10;        /* 画面の裏に隠れるのを防ぐ */
+            color: white;
         }
 
-        button:active { opacity: 0.6; background-color: #000; }
+        /* 色の指定をCSSに分ける（これで参加ボタンが押せるようになる） */
+        .btn-main { background-color: #2c3e50; }
+        .btn-sub { background-color: #7f8c8d; }
+        .btn-danger { background-color: #e74c3c; padding: 6px 12px; font-size: 12px; margin: 0; width: auto; }
+        .btn-send { background-color: #007aff; width: auto; margin-bottom: 0; padding: 0 20px; border-radius: 25px; }
+
+        button:active { opacity: 0.6; transform: scale(0.98); }
 
         input {
             padding: 16px;
@@ -75,6 +82,8 @@
             background: #f8f9fa;
             width: 100%;
             -webkit-appearance: none;
+            position: relative;
+            z-index: 10;
         }
 
         /* アイコン選択 */
@@ -85,6 +94,7 @@
             margin: 20px 0;
             overflow-y: auto;
             max-height: 200px;
+            padding: 5px;
         }
         .icon-item {
             font-size: 28px;
@@ -93,6 +103,9 @@
             border: 2px solid transparent;
             border-radius: 12px;
             background: #f2f2f7;
+            cursor: pointer;
+            z-index: 10;
+            position: relative;
         }
         .icon-item.selected { border: 2px solid #007aff; background: #e1f0ff; }
 
@@ -126,19 +139,10 @@
             font-size: 15px;
             position: relative;
             line-height: 1.4;
+            word-wrap: break-word;
         }
-        .msg.me {
-            align-self: flex-end;
-            background-color: var(--line-green);
-            color: #000;
-            border-top-right-radius: 2px;
-        }
-        .msg.other {
-            align-self: flex-start;
-            background-color: var(--white);
-            color: #000;
-            border-top-left-radius: 2px;
-        }
+        .msg.me { align-self: flex-end; background-color: var(--line-green); color: #000; border-top-right-radius: 2px; }
+        .msg.other { align-self: flex-start; background-color: var(--white); color: #000; border-top-left-radius: 2px; }
         .msg-info { font-size: 11px; margin-bottom: 3px; color: rgba(0,0,0,0.6); }
 
         .chat-input-area {
@@ -147,10 +151,9 @@
             border-top: 1px solid var(--border);
             display: flex;
             gap: 8px;
-            padding-bottom: env(safe-area-inset-bottom); /* iPhone/iPadのバー対策 */
+            padding-bottom: env(safe-area-inset-bottom, 10px);
         }
         .chat-input-area input { flex: 1; margin-bottom: 0; border-radius: 25px; padding: 10px 15px; }
-        .chat-input-area button { width: auto; margin-bottom: 0; padding: 0 20px; border-radius: 25px; background: #007aff; }
 
     </style>
 </head>
@@ -158,10 +161,10 @@
 
 <div id="app">
     <div id="screen-main" class="screen active">
-        <h2>らいのチャット</h2>
+        <h2 style="margin-top: 40px;">チャット</h2>
         <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
-            <button onclick="goToProfile('create')">新しく作る</button>
-            <button onclick="goToProfile('join')" style="background:#7f8c8d;">合言葉で入る</button>
+            <button type="button" class="btn-main" onclick="goToProfile('create')">新しく作る</button>
+            <button type="button" class="btn-sub" onclick="goToProfile('join')">合言葉で入る</button>
         </div>
     </div>
 
@@ -169,25 +172,25 @@
         <h3>プロフィール</h3>
         <input type="text" id="nickname" placeholder="ニックネーム" maxlength="10">
         <div class="icon-grid" id="icon-grid"></div>
-        <button onclick="handleProfileNext()">次へ</button>
+        <button type="button" class="btn-main" onclick="handleProfileNext()">次へ</button>
     </div>
 
     <div id="screen-input" class="screen">
         <h3 id="input-title">ルーム設定</h3>
         <input type="text" id="room-id-input" placeholder="合言葉を決めてね">
-        <button onclick="handleRoomAction()" id="room-action-btn">決定</button>
-        <button onclick="showScreen('screen-main')" style="background:#95a5a6;">戻る</button>
+        <button type="button" class="btn-main" onclick="handleRoomAction()" id="room-action-btn">決定</button>
+        <button type="button" class="btn-sub" onclick="showScreen('screen-main')">戻る</button>
     </div>
 
     <div id="screen-chat" class="screen" style="padding:0">
         <div class="chat-header">
             <span id="chat-room-display">ID: ---</span>
-            <button onclick="exitAction()" style="background:#e74c3c; padding:5px 10px; font-size:12px; margin:0;">終了</button>
+            <button type="button" class="btn-danger" onclick="exitAction()">終了</button>
         </div>
         <div class="chat-messages" id="chat-messages"></div>
         <form class="chat-input-area" onsubmit="sendMessage(); return false;">
             <input type="text" id="message-input" placeholder="メッセージ" autocomplete="off">
-            <button type="submit">送信</button>
+            <button type="submit" class="btn-send">送信</button>
         </form>
     </div>
 </div>
@@ -206,11 +209,12 @@
         const div = document.createElement('div');
         div.className = 'icon-item';
         div.innerText = icon;
-        div.addEventListener('click', () => {
+        // iPad対応のためonclickを使用
+        div.onclick = function() {
             document.querySelectorAll('.icon-item').forEach(el => el.classList.remove('selected'));
             div.classList.add('selected');
             selectedIcon = icon;
-        });
+        };
         iconGrid.appendChild(div);
     });
 
@@ -271,7 +275,7 @@
             senderId: socket.id
         });
         input.value = '';
-        input.focus(); // iPadでキーボードを閉じさせない
+        input.focus();
     }
 
     socket.on('receive-message', (data) => {
@@ -287,8 +291,7 @@
     socket.on('sys-message', (txt) => {
         const container = document.getElementById('chat-messages');
         const div = document.createElement('div');
-        div.className = 'msg-sys';
-        div.style = "align-self:center; font-size:12px; color:white; background:rgba(0,0,0,0.2); padding:2px 10px; border-radius:10px; margin:5px 0;";
+        div.style = "align-self:center; font-size:12px; color:white; background:rgba(0,0,0,0.2); padding:4px 12px; border-radius:10px; margin:5px 0;";
         div.innerText = txt;
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
