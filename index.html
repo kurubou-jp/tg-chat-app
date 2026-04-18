@@ -4,7 +4,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>RAI Chat School v2</title>
+    <title>Chat</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root {
@@ -122,7 +122,7 @@
 
 <div id="app">
     <div id="screen-main" class="screen active">
-        <h2 style="text-align:center">らいのチャット</h2>
+        <h2 style="text-align:center">チャット</h2>
         <div style="flex:1; display:flex; flex-direction:column; justify-content:center">
             <button onclick="goToProfile('create')">新しく作る (Enter)</button>
             <button onclick="goToProfile('join')" style="background:#666">合言葉で入る</button>
@@ -193,7 +193,7 @@
     function handleProfileNext() {
         myData.nickname = document.getElementById('nickname').value.trim();
         myData.icon = selectedIcon;
-        if (!myData.nickname) return alert("名前を入れてな！");
+        if (!myData.nickname) return alert("名前を入れてね！");
         document.getElementById('input-title').innerText = (mode === 'create') ? "ルーム作成" : "ルーム参加";
         showScreen('screen-input');
     }
@@ -206,7 +206,7 @@
                 else alert(res.message);
             });
         } else {
-            if (!id) return alert("合言葉をいれてな！");
+            if (!id) return alert("合言葉をいれてね！");
             socket.emit('join-room', { roomId: id, nickname: myData.nickname }, (res) => {
                 if (res.success) { myData.roomId = id; startChat(); }
                 else alert(res.message);
