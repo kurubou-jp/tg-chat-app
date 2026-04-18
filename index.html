@@ -1,9 +1,10 @@
+
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>RAI Chat School</title>
+    <title>RAI Chat School v2</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root {
@@ -12,7 +13,6 @@
             --line-blue: #74bad4;
         }
 
-        /* 学校iPadの古いブラウザでも崩れない設定 */
         * { box-sizing: border-box; touch-action: manipulation; }
         
         body {
@@ -22,6 +22,9 @@
             height: 100vh;
             display: flex;
             justify-content: center;
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
         }
 
         #app {
@@ -36,7 +39,6 @@
         .screen { display: none; padding: 20px; flex-direction: column; height: 100%; }
         .active { display: flex; }
 
-        /* キーボード操作を邪魔しない入力欄 */
         input {
             padding: 15px;
             font-size: 16px;
@@ -46,7 +48,6 @@
             outline: none;
         }
 
-        /* 押しやすい大きなボタン */
         button {
             padding: 15px;
             font-size: 16px;
@@ -60,7 +61,6 @@
         }
         button:active { opacity: 0.7; }
 
-        /* アイコン選択 */
         .icon-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
@@ -78,7 +78,6 @@
         }
         .icon-item.selected { border-color: #007aff; background: #e1f0ff; }
 
-        /* チャット画面 (LINE風) */
         .chat-messages {
             flex: 1;
             background: var(--line-blue);
@@ -98,11 +97,23 @@
         .msg.me { align-self: flex-end; background: var(--line-green); }
         .msg.other { align-self: flex-start; background: white; }
 
+        /* 入室通知のスタイル */
+        .msg-sys {
+            align-self: center;
+            background: rgba(0,0,0,0.15);
+            color: white;
+            font-size: 12px;
+            padding: 4px 12px;
+            border-radius: 20px;
+            margin: 5px 0;
+        }
+
         .chat-input-area {
             padding: 10px;
             display: flex;
             gap: 5px;
             border-top: 1px solid #ddd;
+            background: white;
         }
         .chat-input-area input { flex: 1; margin-bottom: 0; border-radius: 20px; }
     </style>
@@ -140,7 +151,7 @@
         <div class="chat-messages" id="chat-messages"></div>
         <form class="chat-input-area" onsubmit="sendMessage(); return false;">
             <input type="text" id="message-input" placeholder="メッセージ" autocomplete="off">
-            <button type="submit" style="margin:0; padding:5px 15px; background:#007aff">送信</button>
+            <button type="submit" style="margin:0; padding:5px 15px; background:#007aff; color:white; border-radius:20px;">送信</button>
         </form>
     </div>
 </div>
@@ -163,7 +174,6 @@
         iconGrid.appendChild(div);
     });
 
-    // キーボードのEnterだけで画面を進める魔法
     window.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') {
             const active = document.querySelector('.screen.active').id;
@@ -175,7 +185,7 @@
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         const input = document.getElementById(id).querySelector('input');
-        if (input) setTimeout(() => input.focus(), 100); // 100ms待ってからフォーカス
+        if (input) setTimeout(() => input.focus(), 150);
     }
 
     function goToProfile(m) { mode = m; showScreen('screen-profile'); }
@@ -219,11 +229,22 @@
         input.focus();
     }
 
+    // メッセージ受信
     socket.on('receive-message', (data) => {
         const container = document.getElementById('chat-messages');
         const div = document.createElement('div');
         div.className = `msg ${data.senderId === socket.id ? 'me' : 'other'}`;
         div.innerHTML = `<div style="font-size:10px;opacity:0.6">${data.icon} ${data.nickname}</div>${data.text}`;
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    });
+
+    // ★追加：入室・退室通知の受信★
+    socket.on('sys-message', (txt) => {
+        const container = document.getElementById('chat-messages');
+        const div = document.createElement('div');
+        div.className = 'msg-sys';
+        div.innerText = txt;
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
     });
