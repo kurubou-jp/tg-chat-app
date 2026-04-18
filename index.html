@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>RAI Chat</title>
+    <title>RAI Chat Keyboard-Ready</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root {
@@ -14,21 +14,22 @@
             --border: #e5e5e7;
         }
 
-        /* iOSのタッチ操作を最優先に安定させる */
         * {
             touch-action: manipulation;
-            -webkit-tap-highlight-color: transparent;
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
         }
 
         body {
-            font-family: -apple-system, sans-serif;
+            font-family: -apple-system, "Helvetica Neue", Arial, sans-serif;
             margin: 0;
             background-color: #f0f0f0;
             height: 100vh;
             display: flex;
             justify-content: center;
-            overflow: hidden; /* 画面全体の揺れを防止 */
+            overflow: hidden;
+            position: fixed;
+            width: 100%;
         }
 
         #app {
@@ -38,15 +39,14 @@
             background-color: var(--white);
             display: flex;
             flex-direction: column;
-            position: relative;
+            box-shadow: 0 0 20px rgba(0,0,0,0.1);
         }
 
-        .screen { display: none; padding: 20px; flex-direction: column; height: 100%; overflow-y: auto; }
+        .screen { display: none; padding: 20px; flex-direction: column; height: 100%; }
         .active { display: flex; }
 
-        h2, h3 { text-align: center; color: var(--text-dark); margin-top: 20px; pointer-events: none; }
+        h2 { text-align: center; color: var(--text-dark); margin-top: 40px; }
 
-        /* ボタンの装飾（iOSで絶対に押せるように設定） */
         button {
             padding: 16px;
             border: none;
@@ -54,41 +54,38 @@
             font-size: 16px;
             font-weight: bold;
             cursor: pointer;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             -webkit-appearance: none;
             display: block;
             width: 100%;
             color: white;
-            position: relative;
-            z-index: 999; /* 他の透明な要素に邪魔されないように一番手前に出す */
+            transition: 0.2s;
         }
-        
+
         .btn-main { background-color: #2c3e50; }
         .btn-sub { background-color: #7f8c8d; }
-        .btn-danger { background-color: #e74c3c; padding: 6px 12px; font-size: 12px; margin: 0; width: auto; }
         .btn-send { background-color: #007aff; width: auto; margin-bottom: 0; padding: 0 20px; border-radius: 25px; }
 
-        button:active { opacity: 0.7; }
+        button:active { opacity: 0.6; }
 
         input {
             padding: 16px;
             border: 1px solid var(--border);
             border-radius: 8px;
             font-size: 16px;
-            margin-bottom: 15px;
+            margin-bottom: 12px;
             background: #f8f9fa;
             width: 100%;
             -webkit-appearance: none;
-            position: relative;
-            z-index: 999;
         }
 
         .icon-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
             gap: 10px;
-            margin: 10px 0 20px 0;
-            padding: 5px;
+            margin: 20px 0;
+            overflow-y: auto;
+            max-height: 200px;
         }
         .icon-item {
             font-size: 28px;
@@ -98,12 +95,9 @@
             border-radius: 12px;
             background: #f2f2f7;
             cursor: pointer;
-            z-index: 999;
-            position: relative;
         }
         .icon-item.selected { border: 2px solid #007aff; background: #e1f0ff; }
 
-        /* チャット画面 */
         .chat-header {
             padding: 10px 15px;
             background: #2c3e50;
@@ -112,7 +106,6 @@
             justify-content: space-between;
             align-items: center;
             font-weight: bold;
-            z-index: 1000;
         }
         
         .chat-messages {
@@ -131,13 +124,11 @@
             padding: 10px 14px;
             border-radius: 15px;
             font-size: 15px;
-            position: relative;
             line-height: 1.4;
             word-wrap: break-word;
         }
-        .msg.me { align-self: flex-end; background-color: var(--line-green); color: #000; border-top-right-radius: 2px; }
-        .msg.other { align-self: flex-start; background-color: var(--white); color: #000; border-top-left-radius: 2px; }
-        .msg-info { font-size: 11px; margin-bottom: 3px; color: rgba(0,0,0,0.6); }
+        .msg.me { align-self: flex-end; background-color: var(--line-green); border-top-right-radius: 2px; }
+        .msg.other { align-self: flex-start; background-color: var(--white); border-top-left-radius: 2px; }
 
         .chat-input-area {
             padding: 10px;
@@ -145,6 +136,7 @@
             border-top: 1px solid var(--border);
             display: flex;
             gap: 8px;
+            padding-bottom: env(safe-area-inset-bottom);
         }
         .chat-input-area input { flex: 1; margin-bottom: 0; border-radius: 25px; padding: 10px 15px; }
 
@@ -154,81 +146,79 @@
 
 <div id="app">
     <div id="screen-main" class="screen active">
-        <h2 style="margin-top: 50px;">らいのチャット</h2>
+        <h2>らいのチャット</h2>
         <div style="flex:1; display:flex; flex-direction:column; justify-content:center;">
-            <button type="button" class="btn-main" onclick="goToProfile('create')" ontouchend="goToProfile('create'); event.preventDefault();">新しく作る</button>
-            <button type="button" class="btn-sub" onclick="goToProfile('join')" ontouchend="goToProfile('join'); event.preventDefault();">合言葉で入る</button>
+            <button class="btn-main" onclick="goToProfile('create')">新しく作る (Enter)</button>
+            <button class="btn-sub" onclick="goToProfile('join')">合言葉で入る</button>
         </div>
     </div>
 
     <div id="screen-profile" class="screen">
-        <h3 style="margin-top: 30px;">プロフィール</h3>
-        <input type="text" id="nickname" placeholder="ニックネーム" maxlength="10">
+        <h3>プロフィール</h3>
+        <input type="text" id="nickname" placeholder="ニックネーム" maxlength="10" onkeydown="if(event.key==='Enter')handleProfileNext()">
         <div class="icon-grid" id="icon-grid"></div>
-        <button type="button" class="btn-main" onclick="handleProfileNext()" ontouchend="handleProfileNext(); event.preventDefault();">次へ</button>
+        <button class="btn-main" onclick="handleProfileNext()">次へ (Enter)</button>
     </div>
 
     <div id="screen-input" class="screen">
-        <h3 id="input-title" style="margin-top: 30px;">ルーム設定</h3>
-        <input type="text" id="room-id-input" placeholder="合言葉を決めてね">
-        <button type="button" class="btn-main" onclick="handleRoomAction()" ontouchend="handleRoomAction(); event.preventDefault();" id="room-action-btn">決定</button>
-        <button type="button" class="btn-sub" onclick="showScreen('screen-main')" ontouchend="showScreen('screen-main'); event.preventDefault();">戻る</button>
+        <h3 id="input-title">ルーム設定</h3>
+        <input type="text" id="room-id-input" placeholder="合言葉を決めてね" onkeydown="if(event.key==='Enter')handleRoomAction()">
+        <button class="btn-main" onclick="handleRoomAction()" id="room-action-btn">決定 (Enter)</button>
+        <button class="btn-sub" onclick="showScreen('screen-main')">戻る</button>
     </div>
 
     <div id="screen-chat" class="screen" style="padding:0">
         <div class="chat-header">
             <span id="chat-room-display">ID: ---</span>
-            <button type="button" class="btn-danger" onclick="exitAction()" ontouchend="exitAction(); event.preventDefault();">終了</button>
+            <button onclick="exitAction()" style="background:#e74c3c; width:auto; padding:5px 10px; font-size:12px; margin:0;">終了</button>
         </div>
         <div class="chat-messages" id="chat-messages"></div>
         <form class="chat-input-area" onsubmit="sendMessage(); return false;">
             <input type="text" id="message-input" placeholder="メッセージ" autocomplete="off">
-            <button type="submit" class="btn-send" ontouchend="sendMessage(); event.preventDefault();">送信</button>
+            <button type="submit" class="btn-send">送信</button>
         </form>
     </div>
 </div>
 
 <script>
-    const socket = io({
-        transports: ['websocket', 'polling'],
-        reconnection: true
-    });
-
-    let mode = '', selectedIcon = '', myData = { nickname: '', icon: '', roomId: '', isOwner: false };
+    const socket = io({ transports: ['websocket', 'polling'] });
+    let mode = '', selectedIcon = '😊', myData = { nickname: '', icon: '', roomId: '', isOwner: false };
     const icons = ["😊", "🐱", "🐶", "🦊", "🐻", "🐯", "🤖", "👻", "⭐", "🍀", "🎨", "🎮", "⚽", "🍎", "🚀", "💎", "🐳", "🍕", "🌈", "🔥"];
 
     const iconGrid = document.getElementById('icon-grid');
     icons.forEach(icon => {
         const div = document.createElement('div');
-        div.className = 'icon-item';
+        div.className = 'icon-item' + (icon === '😊' ? ' selected' : '');
         div.innerText = icon;
-        // iPad用のタッチ対応
-        const selectIcon = (e) => {
-            if(e) e.preventDefault();
+        div.onclick = () => {
             document.querySelectorAll('.icon-item').forEach(el => el.classList.remove('selected'));
             div.classList.add('selected');
             selectedIcon = icon;
         };
-        div.onclick = selectIcon;
-        div.ontouchend = selectIcon;
         iconGrid.appendChild(div);
+    });
+
+    // キーボードのEnterキーを監視
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            const activeScreen = document.querySelector('.screen.active').id;
+            if (activeScreen === 'screen-main') goToProfile('create');
+        }
     });
 
     function showScreen(id) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(id).classList.add('active');
+        const input = document.getElementById(id).querySelector('input');
+        if (input) input.focus(); // 画面が変わったら自動で入力欄にフォーカス
     }
 
-    function goToProfile(m) {
-        mode = m;
-        showScreen('screen-profile');
-    }
+    function goToProfile(m) { mode = m; showScreen('screen-profile'); }
 
     function handleProfileNext() {
         myData.nickname = document.getElementById('nickname').value.trim();
         myData.icon = selectedIcon;
-        if (!myData.nickname || !selectedIcon) return alert("名前とアイコンを選んでね！");
-        
+        if (!myData.nickname) return alert("名前を入れてな！");
         document.getElementById('input-title').innerText = (mode === 'create') ? "ルーム作成" : "ルーム参加";
         document.getElementById('room-action-btn').innerText = (mode === 'create') ? "作成して開始" : "入室する";
         showScreen('screen-input');
@@ -242,7 +232,7 @@
                 else alert(res.message);
             });
         } else {
-            if (!id) return alert("合言葉を入れてね！");
+            if (!id) return alert("合言葉を入れてな！");
             socket.emit('join-room', { roomId: id, nickname: myData.nickname }, (res) => {
                 if (res.success) { myData.roomId = id; myData.isOwner = false; startChat(); }
                 else alert(res.message);
@@ -264,35 +254,23 @@
         const input = document.getElementById('message-input');
         if (!input.value.trim()) return;
         socket.emit('send-message', {
-            roomId: myData.roomId,
-            nickname: myData.nickname,
-            icon: myData.icon,
-            text: input.value,
-            senderId: socket.id
+            roomId: myData.roomId, nickname: myData.nickname,
+            icon: myData.icon, text: input.value, senderId: socket.id
         });
         input.value = '';
+        input.focus();
     }
 
     socket.on('receive-message', (data) => {
         const container = document.getElementById('chat-messages');
         const div = document.createElement('div');
-        const side = data.senderId === socket.id ? 'me' : 'other';
-        div.className = `msg ${side}`;
-        div.innerHTML = `<div class="msg-info">${data.icon} ${data.nickname}</div><div>${data.text}</div>`;
+        div.className = `msg ${data.senderId === socket.id ? 'me' : 'other'}`;
+        div.innerHTML = `<div style="font-size:11px;opacity:0.6">${data.icon} ${data.nickname}</div>${data.text}`;
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
     });
 
-    socket.on('sys-message', (txt) => {
-        const container = document.getElementById('chat-messages');
-        const div = document.createElement('div');
-        div.style = "align-self:center; font-size:12px; color:white; background:rgba(0,0,0,0.2); padding:4px 12px; border-radius:10px; margin:5px 0;";
-        div.innerText = txt;
-        container.appendChild(div);
-        container.scrollTop = container.scrollHeight;
-    });
-
-    socket.on('room-terminated', () => { alert("ルームが終了しました"); location.reload(); });
+    socket.on('room-terminated', () => { alert("終了しました"); location.reload(); });
 </script>
 </body>
 </html>
