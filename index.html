@@ -1,10 +1,9 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Chat</title>
+    <title>RAI Chat Sound Edition</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root {
@@ -97,7 +96,6 @@
         .msg.me { align-self: flex-end; background: var(--line-green); }
         .msg.other { align-self: flex-start; background: white; }
 
-        /* 入室通知のスタイル */
         .msg-sys {
             align-self: center;
             background: rgba(0,0,0,0.15);
@@ -122,7 +120,7 @@
 
 <div id="app">
     <div id="screen-main" class="screen active">
-        <h2 style="text-align:center">チャット</h2>
+        <h2 style="text-align:center">らいのチャット</h2>
         <div style="flex:1; display:flex; flex-direction:column; justify-content:center">
             <button onclick="goToProfile('create')">新しく作る (Enter)</button>
             <button onclick="goToProfile('join')" style="background:#666">合言葉で入る</button>
@@ -161,12 +159,47 @@
     let mode = '', selectedIcon = '😊', myData = { nickname: '', icon: '', roomId: '' };
     const icons = ["😊", "🐱", "🐶", "🦊", "🐻", "🐯", "🤖", "👻", "⭐", "🍀", "🎨", "🎮", "⚽", "🍎", "🚀", "💎", "🐳", "🍕", "🌈", "🔥"];
 
+    // 効果音再生システム
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playSound(type) {
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+
+        const now = audioCtx.currentTime;
+        if (type === 'su') { // スッ（次へ）
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(800, now);
+            osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+            gain.gain.setValueAtTime(0.3, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.1);
+            osc.start(); osc.stop(now + 0.1);
+        } else if (type === 'piron') { // ぴろん！（参加）
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(660, now);
+            osc.frequency.setValueAtTime(880, now + 0.1);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.3);
+            osc.start(); osc.stop(now + 0.3);
+        } else if (type === 'pon') { // ポン（送受信）
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(400, now);
+            osc.frequency.exponentialRampToValueAtTime(600, now + 0.05);
+            gain.gain.setValueAtTime(0.2, now);
+            gain.gain.linearRampToValueAtTime(0, now + 0.1);
+            osc.start(); osc.stop(now + 0.1);
+        }
+    }
+
     const iconGrid = document.getElementById('icon-grid');
     icons.forEach(icon => {
         const div = document.createElement('div');
         div.className = 'icon-item' + (icon === '😊' ? ' selected' : '');
         div.innerText = icon;
         div.onclick = () => {
+            playSound('su');
             document.querySelectorAll('.icon-item').forEach(el => el.classList.remove('selected'));
             div.classList.add('selected');
             selectedIcon = icon;
@@ -188,12 +221,17 @@
         if (input) setTimeout(() => input.focus(), 150);
     }
 
-    function goToProfile(m) { mode = m; showScreen('screen-profile'); }
+    function goToProfile(m) { 
+        playSound('su');
+        mode = m; 
+        showScreen('screen-profile'); 
+    }
 
     function handleProfileNext() {
+        playSound('su');
         myData.nickname = document.getElementById('nickname').value.trim();
         myData.icon = selectedIcon;
-        if (!myData.nickname) return alert("名前を入れてね！");
+        if (!myData.nickname) return alert("名前を入れてな！");
         document.getElementById('input-title').innerText = (mode === 'create') ? "ルーム作成" : "ルーム参加";
         showScreen('screen-input');
     }
@@ -202,14 +240,18 @@
         const id = document.getElementById('room-id-input').value.trim();
         if (mode === 'create') {
             socket.emit('create-room', id, (res) => {
-                if (res.success) { myData.roomId = res.roomId; startChat(); }
-                else alert(res.message);
+                if (res.success) { 
+                    playSound('piron');
+                    myData.roomId = res.roomId; startChat(); 
+                } else alert(res.message);
             });
         } else {
-            if (!id) return alert("合言葉をいれてね！");
+            if (!id) return alert("合言葉をいれてな！");
             socket.emit('join-room', { roomId: id, nickname: myData.nickname }, (res) => {
-                if (res.success) { myData.roomId = id; startChat(); }
-                else alert(res.message);
+                if (res.success) { 
+                    playSound('piron');
+                    myData.roomId = id; startChat(); 
+                } else alert(res.message);
             });
         }
     }
@@ -222,6 +264,7 @@
     function sendMessage() {
         const input = document.getElementById('message-input');
         if (!input.value.trim()) return;
+        playSound('pon');
         socket.emit('send-message', {
             roomId: myData.roomId, nickname: myData.nickname, icon: myData.icon, text: input.value, senderId: socket.id
         });
@@ -229,8 +272,8 @@
         input.focus();
     }
 
-    // メッセージ受信
     socket.on('receive-message', (data) => {
+        if (data.senderId !== socket.id) playSound('pon');
         const container = document.getElementById('chat-messages');
         const div = document.createElement('div');
         div.className = `msg ${data.senderId === socket.id ? 'me' : 'other'}`;
@@ -239,7 +282,6 @@
         container.scrollTop = container.scrollHeight;
     });
 
-    // ★追加：入室・退室通知の受信★
     socket.on('sys-message', (txt) => {
         const container = document.getElementById('chat-messages');
         const div = document.createElement('div');
