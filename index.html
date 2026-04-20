@@ -2,8 +2,8 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>RAI Chat Sound Edition</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>RAI Chat Final</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root {
@@ -22,6 +22,7 @@
             display: flex;
             justify-content: center;
             overflow: hidden;
+            /* iOSのバウンス（揺れ）対策 */
             position: fixed;
             width: 100%;
         }
@@ -33,6 +34,8 @@
             background: white;
             display: flex;
             flex-direction: column;
+            /* 下のバーに被らないようにする設定 */
+            padding-bottom: env(safe-area-inset-bottom);
         }
 
         .screen { display: none; padding: 20px; flex-direction: column; height: 100%; }
@@ -45,6 +48,7 @@
             border-radius: 8px;
             margin-bottom: 10px;
             outline: none;
+            -webkit-appearance: none; /* iOS特有の影を消す */
         }
 
         button {
@@ -58,13 +62,13 @@
             cursor: pointer;
             margin-bottom: 10px;
         }
-        button:active { opacity: 0.7; }
 
         .icon-grid {
             display: grid;
             grid-template-columns: repeat(5, 1fr);
             gap: 10px;
             margin-bottom: 20px;
+            overflow-y: auto;
         }
         .icon-item {
             font-size: 24px;
@@ -85,6 +89,7 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            -webkit-overflow-scrolling: touch;
         }
         .msg {
             max-width: 80%;
@@ -106,8 +111,9 @@
             margin: 5px 0;
         }
 
+        /* チャット入力エリア（ここが隠れないように調整） */
         .chat-input-area {
-            padding: 10px;
+            padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
             display: flex;
             gap: 5px;
             border-top: 1px solid #ddd;
@@ -159,7 +165,6 @@
     let mode = '', selectedIcon = '😊', myData = { nickname: '', icon: '', roomId: '' };
     const icons = ["😊", "🐱", "🐶", "🦊", "🐻", "🐯", "🤖", "👻", "⭐", "🍀", "🎨", "🎮", "⚽", "🍎", "🚀", "💎", "🐳", "🍕", "🌈", "🔥"];
 
-    // 効果音再生システム
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     function playSound(type) {
         if (audioCtx.state === 'suspended') audioCtx.resume();
@@ -167,28 +172,21 @@
         const gain = audioCtx.createGain();
         osc.connect(gain);
         gain.connect(audioCtx.destination);
-
         const now = audioCtx.currentTime;
-        if (type === 'su') { // スッ（次へ）
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(800, now);
+        if (type === 'su') {
+            osc.type = 'sine'; osc.frequency.setValueAtTime(800, now);
             osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
-            gain.gain.setValueAtTime(0.3, now);
-            gain.gain.linearRampToValueAtTime(0, now + 0.1);
+            gain.gain.setValueAtTime(0.3, now); gain.gain.linearRampToValueAtTime(0, now + 0.1);
             osc.start(); osc.stop(now + 0.1);
-        } else if (type === 'piron') { // ぴろん！（参加）
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(660, now);
+        } else if (type === 'piron') {
+            osc.type = 'triangle'; osc.frequency.setValueAtTime(660, now);
             osc.frequency.setValueAtTime(880, now + 0.1);
-            gain.gain.setValueAtTime(0.2, now);
-            gain.gain.linearRampToValueAtTime(0, now + 0.3);
+            gain.gain.setValueAtTime(0.2, now); gain.gain.linearRampToValueAtTime(0, now + 0.3);
             osc.start(); osc.stop(now + 0.3);
-        } else if (type === 'pon') { // ポン（送受信）
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(400, now);
+        } else if (type === 'pon') {
+            osc.type = 'sine'; osc.frequency.setValueAtTime(400, now);
             osc.frequency.exponentialRampToValueAtTime(600, now + 0.05);
-            gain.gain.setValueAtTime(0.2, now);
-            gain.gain.linearRampToValueAtTime(0, now + 0.1);
+            gain.gain.setValueAtTime(0.2, now); gain.gain.linearRampToValueAtTime(0, now + 0.1);
             osc.start(); osc.stop(now + 0.1);
         }
     }
@@ -218,14 +216,10 @@
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(id).classList.add('active');
         const input = document.getElementById(id).querySelector('input');
-        if (input) setTimeout(() => input.focus(), 150);
+        if (input) setTimeout(() => input.focus(), 200);
     }
 
-    function goToProfile(m) { 
-        playSound('su');
-        mode = m; 
-        showScreen('screen-profile'); 
-    }
+    function goToProfile(m) { playSound('su'); mode = m; showScreen('screen-profile'); }
 
     function handleProfileNext() {
         playSound('su');
@@ -240,18 +234,14 @@
         const id = document.getElementById('room-id-input').value.trim();
         if (mode === 'create') {
             socket.emit('create-room', id, (res) => {
-                if (res.success) { 
-                    playSound('piron');
-                    myData.roomId = res.roomId; startChat(); 
-                } else alert(res.message);
+                if (res.success) { playSound('piron'); myData.roomId = res.roomId; startChat(); }
+                else alert(res.message);
             });
         } else {
             if (!id) return alert("合言葉をいれてな！");
             socket.emit('join-room', { roomId: id, nickname: myData.nickname }, (res) => {
-                if (res.success) { 
-                    playSound('piron');
-                    myData.roomId = id; startChat(); 
-                } else alert(res.message);
+                if (res.success) { playSound('piron'); myData.roomId = id; startChat(); }
+                else alert(res.message);
             });
         }
     }
