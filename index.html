@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>RAI Chat Final</title>
+    <title>RAI Chat Final Space</title>
     <script src="/socket.io/socket.io.js"></script>
     <style>
         :root {
@@ -22,7 +22,6 @@
             display: flex;
             justify-content: center;
             overflow: hidden;
-            /* iOSのバウンス（揺れ）対策 */
             position: fixed;
             width: 100%;
         }
@@ -34,8 +33,6 @@
             background: white;
             display: flex;
             flex-direction: column;
-            /* 下のバーに被らないようにする設定 */
-            padding-bottom: env(safe-area-inset-bottom);
         }
 
         .screen { display: none; padding: 20px; flex-direction: column; height: 100%; }
@@ -48,7 +45,7 @@
             border-radius: 8px;
             margin-bottom: 10px;
             outline: none;
-            -webkit-appearance: none; /* iOS特有の影を消す */
+            -webkit-appearance: none;
         }
 
         button {
@@ -111,13 +108,18 @@
             margin: 5px 0;
         }
 
-        /* チャット入力エリア（ここが隠れないように調整） */
+        /* チャット入力エリアの調整 */
+        .chat-input-wrapper {
+            background: white;
+            border-top: 1px solid #ddd;
+            /* ここで入力欄の下にガッツリ余白（スペース）を空ける */
+            padding-bottom: calc(40px + env(safe-area-inset-bottom));
+        }
+
         .chat-input-area {
-            padding: 10px 10px calc(10px + env(safe-area-inset-bottom));
+            padding: 10px;
             display: flex;
             gap: 5px;
-            border-top: 1px solid #ddd;
-            background: white;
         }
         .chat-input-area input { flex: 1; margin-bottom: 0; border-radius: 20px; }
     </style>
@@ -150,13 +152,15 @@
     <div id="screen-chat" class="screen" style="padding:0">
         <div style="padding:10px; background:#333; color:white; display:flex; justify-content:space-between; align-items:center">
             <span id="room-id-display">ID: ---</span>
-            <button onclick="location.reload()" style="margin:0; padding:5px 10px; font-size:12px; background:#e74c3c">終了</button>
+            <button onclick="exitAction()" style="margin:0; padding:5px 10px; font-size:12px; background:#e74c3c">終了</button>
         </div>
         <div class="chat-messages" id="chat-messages"></div>
-        <form class="chat-input-area" onsubmit="sendMessage(); return false;">
-            <input type="text" id="message-input" placeholder="メッセージ" autocomplete="off">
-            <button type="submit" style="margin:0; padding:5px 15px; background:#007aff; color:white; border-radius:20px;">送信</button>
-        </form>
+        <div class="chat-input-wrapper">
+            <form class="chat-input-area" onsubmit="sendMessage(); return false;">
+                <input type="text" id="message-input" placeholder="メッセージ" autocomplete="off">
+                <button type="submit" style="margin:0; padding:5px 15px; background:#007aff; color:white; border-radius:20px;">送信</button>
+            </form>
+        </div>
     </div>
 </div>
 
@@ -262,6 +266,12 @@
         input.focus();
     }
 
+    function exitAction() {
+        if (!myData.roomId) return location.reload();
+        socket.emit('terminate-room', myData.roomId);
+        setTimeout(() => { location.reload(); }, 500);
+    }
+
     socket.on('receive-message', (data) => {
         if (data.senderId !== socket.id) playSound('pon');
         const container = document.getElementById('chat-messages');
@@ -279,6 +289,11 @@
         div.innerText = txt;
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
+    });
+
+    socket.on('room-terminated', () => {
+        alert("ルームが終了しました。");
+        location.reload();
     });
 </script>
 </body>
