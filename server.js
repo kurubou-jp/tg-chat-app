@@ -3,41 +3,54 @@ const app = express();
 const http = require('http').createServer(app);
 const io = require('socket.io')(http, {
     cors: {
-        origin: "*", // どこからでも接続できるようにする設定
+        origin: "*",
         methods: ["GET", "POST"]
     }
 });
 
 const rooms = {};
 
+// オープンチャット（常設ルーム）のプリセット定義
+const openRooms = {
+    'open-general': { name: '💬 雑談ルーム', type: 'open' },
+    'open-game': { name: '🎮 ゲーム部', type: 'open' },
+    'open-prog': { name: '💻 プログラミング・技術', type: 'open' },
+    'open-craft': { name: '🎨 工作・趣味', type: 'open' },
+    'open-music': { name: '🎵 音楽・ボカロ', type: 'open' }
+};
+
 app.use(express.static(__dirname));
 
 io.on('connection', (socket) => {
+    // オープンルームの一覧を返す
+    socket.on('get-open-rooms', (callback) => {
+        if (typeof callback === 'function') {
+            callback(openRooms);
+        }
+    });
+
     // ルーム作成（合言葉対応）
     socket.on('create-room', (customId, callback) => {
         let roomId = customId;
         
-        // 合言葉が空なら4桁のランダム番号を生成
         if (!roomId) {
             do {
                 roomId = Math.floor(1000 + Math.random() * 9000).toString();
-            } while (rooms[roomId]);
+            } while (rooms[roomId] || openRooms[roomId]);
         }
 
-        // すでに使われている合言葉ならエラー
-        if (rooms[roomId]) {
+        if (rooms[roomId] || openRooms[roomId]) {
             if (typeof callback === 'function') {
                 callback({ success: false, message: "その合言葉はすでに使われています" });
             }
             return;
         }
 
-        // ルーム作成
-        rooms[roomId] = { owner: socket.id, status: 'active' };
+        rooms[roomId] = { owner: socket.id, status: 'active', type: 'private' };
         socket.join(roomId);
 
         if (typeof callback === 'function') {
-            callback({ success: true, roomId: roomId });
+            callback({ success: true, roomId: roomId, type: 'private' });
         }
     });
 
@@ -45,13 +58,23 @@ io.on('connection', (socket) => {
     socket.on('join-room', (data, callback) => {
         const { roomId, nickname } = data;
         
+        // オープンルームの場合
+        if (openRooms[roomId]) {
+            socket.join(roomId);
+            io.to(roomId).emit('sys-message', `${nickname} が入室しました`);
+            if (typeof callback === 'function') {
+                callback({ success: true, type: 'open', roomName: openRooms[roomId].name });
+            }
+            return;
+        }
+
+        // 通常のプライベート・カスタムルームの場合
         if (rooms[roomId] && rooms[roomId].status === 'active') {
             socket.join(roomId);
-            // 入室メッセージを全員に送る
             io.to(roomId).emit('sys-message', `${nickname} が入室しました`);
             
             if (typeof callback === 'function') {
-                callback({ success: true });
+                callback({ success: true, type: 'private' });
             }
         } else {
             if (typeof callback === 'function') {
@@ -62,12 +85,14 @@ io.on('connection', (socket) => {
 
     // メッセージの送受信
     socket.on('send-message', (data) => {
-        // 全員にメッセージを転送
         io.to(data.roomId).emit('receive-message', data);
     });
 
     // ルーム終了（ホストが退出した時など）
     socket.on('terminate-room', (roomId) => {
+        // オープンルームは終了させない
+        if (openRooms[roomId]) return;
+
         if (rooms[roomId] && rooms[roomId].owner === socket.id) {
             rooms[roomId].status = 'terminated';
             io.to(roomId).emit('room-terminated');
@@ -75,13 +100,11 @@ io.on('connection', (socket) => {
         }
     });
 
-    // 接続が切れた時の処理（予期せぬ切断対策）
     socket.on('disconnect', () => {
-        // 誰が切れたか特定してルームを掃除する処理をここに追加もできる
+        // 必要に応じた切断処理
     });
 });
 
-// ポート設定（Renderなどの公開サーバー用）
 const PORT = process.env.PORT || 3000;
 http.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
