@@ -78,6 +78,26 @@
         }
         .icon-item.selected { border-color: #007aff; background: #e1f0ff; }
 
+        .open-room-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            overflow-y: auto;
+            flex: 1;
+            margin-bottom: 10px;
+        }
+        .open-room-card {
+            padding: 15px;
+            background: #f0f0f0;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 16px;
+            cursor: pointer;
+            border: 2px solid #ddd;
+            text-align: left;
+        }
+        .open-room-card:hover { background: #e1f0ff; border-color: #007aff; }
+
         .chat-messages {
             flex: 1;
             background: var(--line-blue);
@@ -108,7 +128,6 @@
             margin: 5px 0;
         }
 
-        /* チャット入力エリアの調整 */
         .chat-input-wrapper {
             background: white;
             border-top: 1px solid #ddd;
@@ -126,21 +145,26 @@
 <body>
 
 <div id="app">
+    <!-- メイン画面 -->
     <div id="screen-main" class="screen active">
         <h2 style="text-align:center">らいのチャット</h2>
-        <div style="flex:1; display:flex; flex-direction:column; justify-content:center">
-            <button onclick="goToProfile('create')">新しく作る (Enter)</button>
-            <button onclick="goToProfile('join')" style="background:#666">合言葉で入る</button>
+        <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:5px;">
+            <button onclick="goToProfile('create')">新しく部屋を作る</button>
+            <button onclick="goToProfile('join')" style="background:#666">合言葉で部屋に入る</button>
+            <button onclick="goToProfile('open')" style="background:#007aff">オープンチャットに入る</button>
         </div>
     </div>
 
+    <!-- プロフィール画面 -->
     <div id="screen-profile" class="screen">
         <h3>プロフィール</h3>
         <input type="text" id="nickname" placeholder="ニックネーム" onkeydown="if(event.key==='Enter')handleProfileNext()">
         <div class="icon-grid" id="icon-grid"></div>
         <button onclick="handleProfileNext()">次へ (Enter)</button>
+        <button onclick="showScreen('screen-main')" style="background:#666">戻る</button>
     </div>
 
+    <!-- カスタムルームの合言葉入力画面 -->
     <div id="screen-input" class="screen">
         <h3 id="input-title">設定</h3>
         <input type="text" id="room-id-input" placeholder="合言葉" onkeydown="if(event.key==='Enter')handleRoomAction()">
@@ -148,10 +172,20 @@
         <button onclick="showScreen('screen-main')" style="background:#666">戻る</button>
     </div>
 
+    <!-- オープンチャット選択画面 -->
+    <div id="screen-open" class="screen">
+        <h3>オープンチャット一覧</h3>
+        <p style="font-size:13px; color:#666; margin-top:0;">好きな部屋を選んで参加しよう！</p>
+        <div class="open-room-list" id="open-room-list"></div>
+        <button onclick="showScreen('screen-main')" style="background:#666">戻る</button>
+    </div>
+
+    <!-- チャット画面 -->
     <div id="screen-chat" class="screen" style="padding:0">
         <div style="padding:10px; background:#333; color:white; display:flex; justify-content:space-between; align-items:center">
             <span id="room-id-display">ID: ---</span>
-            <button onclick="exitAction()" style="margin:0; padding:5px 10px; font-size:12px; background:#e74c3c">終了</button>
+            <!-- 終了ボタン（プライベート用）と退出ボタン（オープン用）を切り替え -->
+            <button id="exit-btn" onclick="exitAction()" style="margin:0; padding:5px 10px; font-size:12px; background:#e74c3c">終了</button>
         </div>
         <div class="chat-messages" id="chat-messages"></div>
         <div class="chat-input-wrapper">
@@ -165,7 +199,7 @@
 
 <script>
     const socket = io();
-    let mode = '', selectedIcon = '😊', myData = { nickname: '', icon: '', roomId: '' };
+    let mode = '', selectedIcon = '😊', myData = { nickname: '', icon: '', roomId: '', roomType: '' };
     const icons = ["😊", "🐱", "🐶", "🦊", "🐻", "🐯", "🤖", "👻", "⭐", "🍀", "🎨", "🎮", "⚽", "🍎", "🚀", "💎", "🐳", "🍕", "🌈", "🔥"];
 
     const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -208,13 +242,6 @@
         iconGrid.appendChild(div);
     });
 
-    window.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            const active = document.querySelector('.screen.active').id;
-            if (active === 'screen-main') goToProfile('create');
-        }
-    });
-
     function showScreen(id) {
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
         document.getElementById(id).classList.add('active');
@@ -222,36 +249,104 @@
         if (input) setTimeout(() => input.focus(), 200);
     }
 
-    function goToProfile(m) { playSound('su'); mode = m; showScreen('screen-profile'); }
+    function goToProfile(m) { 
+        playSound('su'); 
+        mode = m; 
+        if (mode === 'open') {
+            // オープンチャットの場合はプロフィール設定後にオープンルーム一覧へ行く
+            showScreen('screen-profile');
+        } else {
+            showScreen('screen-profile');
+        }
+    }
 
     function handleProfileNext() {
         playSound('su');
         myData.nickname = document.getElementById('nickname').value.trim();
         myData.icon = selectedIcon;
         if (!myData.nickname) return alert("名前を入れてな！");
-        document.getElementById('input-title').innerText = (mode === 'create') ? "ルーム作成" : "ルーム参加";
-        showScreen('screen-input');
+
+        if (mode === 'open') {
+            loadOpenRooms();
+        } else if (mode === 'create') {
+            document.getElementById('input-title').innerText = "ルーム作成";
+            showScreen('screen-input');
+        } else {
+            document.getElementById('input-title').innerText = "ルーム参加";
+            showScreen('screen-input');
+        }
+    }
+
+    // オープンルーム一覧をサーバーから取得して表示
+    function loadOpenRooms() {
+        socket.emit('get-open-rooms', (rooms) => {
+            const listContainer = document.getElementById('open-room-list');
+            listContainer.innerHTML = '';
+            for (const [id, room] of Object.entries(rooms)) {
+                const btn = document.createElement('div');
+                btn.className = 'open-room-card';
+                btn.innerText = room.name;
+                btn.onclick = () => joinOpenRoom(id, room.name);
+                listContainer.appendChild(btn);
+            }
+            showScreen('screen-open');
+        });
+    }
+
+    function joinOpenRoom(roomId, roomName) {
+        socket.emit('join-room', { roomId: roomId, nickname: myData.nickname }, (res) => {
+            if (res.success) {
+                playSound('piron');
+                myData.roomId = roomId;
+                myData.roomType = 'open';
+                startChat(roomName);
+            } else {
+                alert(res.message);
+            }
+        });
     }
 
     function handleRoomAction() {
         const id = document.getElementById('room-id-input').value.trim();
         if (mode === 'create') {
             socket.emit('create-room', id, (res) => {
-                if (res.success) { playSound('piron'); myData.roomId = res.roomId; startChat(); }
+                if (res.success) { 
+                    playSound('piron'); 
+                    myData.roomId = res.roomId; 
+                    myData.roomType = 'private';
+                    startChat(`ID: ${res.roomId}`); 
+                }
                 else alert(res.message);
             });
         } else {
             if (!id) return alert("合言葉をいれてな！");
             socket.emit('join-room', { roomId: id, nickname: myData.nickname }, (res) => {
-                if (res.success) { playSound('piron'); myData.roomId = id; startChat(); }
+                if (res.success) { 
+                    playSound('piron'); 
+                    myData.roomId = id; 
+                    myData.roomType = 'private';
+                    startChat(`ID: ${id}`); 
+                }
                 else alert(res.message);
             });
         }
     }
 
-    function startChat() {
-        document.getElementById('room-id-display').innerText = `ID: ${myData.roomId}`;
+    function startChat(displayName) {
+        document.getElementById('room-id-display').innerText = displayName;
+        
+        // オープンチャットの場合は「終了」ボタンを「退出」に変える（または隠す）
+        const exitBtn = document.getElementById('exit-btn');
+        if (myData.roomType === 'open') {
+            exitBtn.innerText = "退出";
+            exitBtn.style.background = "#666";
+        } else {
+            exitBtn.innerText = "終了";
+            exitBtn.style.background = "#e74c3c";
+        }
+
         showScreen('screen-chat');
+        document.getElementById('chat-messages').innerHTML = ''; // 画面切り替え時にクリア
     }
 
     function sendMessage() {
@@ -266,9 +361,14 @@
     }
 
     function exitAction() {
-        if (!myData.roomId) return location.reload();
-        socket.emit('terminate-room', myData.roomId);
-        setTimeout(() => { location.reload(); }, 500);
+        if (myData.roomType === 'open') {
+            // オープンチャットなら単にリロードしてホームに戻る
+            location.reload();
+        } else {
+            if (!myData.roomId) return location.reload();
+            socket.emit('terminate-room', myData.roomId);
+            setTimeout(() => { location.reload(); }, 500);
+        }
     }
 
     // 簡易的なHTMLエスケープ
