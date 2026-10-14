@@ -128,6 +128,36 @@
             margin: 5px 0;
         }
 
+        /* スタンプ表示用スタイル */
+        .stamp-msg {
+            font-size: 36px;
+            line-height: 1.2;
+            background: transparent !important;
+            padding: 2px !important;
+        }
+
+        /* スタンプピッカー（選択パネル） */
+        #stamp-picker {
+            display: none;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 8px;
+            padding: 10px;
+            background: #f9f9f9;
+            border-top: 1px solid #ddd;
+            max-height: 180px;
+            overflow-y: auto;
+        }
+        .stamp-item {
+            background: white;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 28px;
+            text-align: center;
+            padding: 8px;
+            cursor: pointer;
+        }
+        .stamp-item:hover { background: #e1f0ff; border-color: #007aff; }
+
         .chat-input-wrapper {
             background: white;
             border-top: 1px solid #ddd;
@@ -138,6 +168,7 @@
             padding: 10px;
             display: flex;
             gap: 5px;
+            align-items: center;
         }
         .chat-input-area input { flex: 1; margin-bottom: 0; border-radius: 20px; }
     </style>
@@ -145,17 +176,15 @@
 <body>
 
 <div id="app">
-    <!-- メイン画面 -->
     <div id="screen-main" class="screen active">
-        <h2 style="text-align:center">チャット</h2>
+        <h2 style="text-align:center">らいのチャット</h2>
         <div style="flex:1; display:flex; flex-direction:column; justify-content:center; gap:5px;">
             <button onclick="goToProfile('create')">新しく部屋を作る</button>
             <button onclick="goToProfile('join')" style="background:#666">合言葉で部屋に入る</button>
-            <button onclick="goToProfile('open')" style="background:#007aff">ルームに入る</button>
+            <button onclick="goToProfile('open')" style="background:#007aff">オープンチャットに入る</button>
         </div>
     </div>
 
-    <!-- プロフィール画面 -->
     <div id="screen-profile" class="screen">
         <h3>プロフィール</h3>
         <input type="text" id="nickname" placeholder="ニックネーム" onkeydown="if(event.key==='Enter')handleProfileNext()">
@@ -164,7 +193,6 @@
         <button onclick="showScreen('screen-main')" style="background:#666">戻る</button>
     </div>
 
-    <!-- カスタムルームの合言葉入力画面 -->
     <div id="screen-input" class="screen">
         <h3 id="input-title">設定</h3>
         <input type="text" id="room-id-input" placeholder="合言葉" onkeydown="if(event.key==='Enter')handleRoomAction()">
@@ -172,27 +200,40 @@
         <button onclick="showScreen('screen-main')" style="background:#666">戻る</button>
     </div>
 
-    <!-- オープンチャット選択画面 -->
     <div id="screen-open" class="screen">
-        <h3>ルーム一覧</h3>
+        <h3>オープンチャット一覧</h3>
         <p style="font-size:13px; color:#666; margin-top:0;">好きな部屋を選んで参加しよう！</p>
         <div class="open-room-list" id="open-room-list"></div>
         <button onclick="showScreen('screen-main')" style="background:#666">戻る</button>
     </div>
 
-    <!-- チャット画面 -->
     <div id="screen-chat" class="screen" style="padding:0">
         <div style="padding:10px; background:#333; color:white; display:flex; justify-content:space-between; align-items:center">
             <span id="room-id-display">ID: ---</span>
-            <!-- 終了ボタン（プライベート用）と退出ボタン（オープン用）を切り替え -->
             <button id="exit-btn" onclick="exitAction()" style="margin:0; padding:5px 10px; font-size:12px; background:#e74c3c">終了</button>
         </div>
         <div class="chat-messages" id="chat-messages"></div>
+
+        <!-- スタンプ選択パネル -->
+        <div id="stamp-picker">
+            <div class="stamp-item" onclick="sendStamp('👍')">👍</div>
+            <div class="stamp-item" onclick="sendStamp('❤️')">❤️</div>
+            <div class="stamp-item" onclick="sendStamp('🔥')">🔥</div>
+            <div class="stamp-item" onclick="sendStamp('🎉')">🎉</div>
+            <div class="stamp-item" onclick="sendStamp('😂')">😂</div>
+            <div class="stamp-item" onclick="sendStamp('✨')">✨</div>
+            <div class="stamp-item" onclick="sendStamp('🙇')">🙇</div>
+            <div class="stamp-item" onclick="sendStamp('⭐')">⭐</div>
+        </div>
+
         <div class="chat-input-wrapper">
-            <form class="chat-input-area" onsubmit="sendMessage(); return false;">
-                <input type="text" id="message-input" placeholder="メッセージ" autocomplete="off">
-                <button type="submit" style="margin:0; padding:5px 15px; background:#007aff; color:white; border-radius:20px;">送信</button>
-            </form>
+            <div class="chat-input-area">
+                <!-- スタンプ切り替えボタン -->
+                <button type="button" onclick="toggleStampPicker()" style="margin:0; padding:8px 12px; background:#eee; color:#333; border-radius:20px; font-size:18px;">😊</button>
+                
+                <input type="text" id="message-input" placeholder="メッセージ" autocomplete="off" onkeydown="if(event.key==='Enter')sendMessage()">
+                <button type="button" onclick="sendMessage()" style="margin:0; padding:8px 15px; background:#007aff; color:white; border-radius:20px;">送信</button>
+            </div>
         </div>
     </div>
 </div>
@@ -252,12 +293,7 @@
     function goToProfile(m) { 
         playSound('su'); 
         mode = m; 
-        if (mode === 'open') {
-            // オープンチャットの場合はプロフィール設定後にオープンルーム一覧へ行く
-            showScreen('screen-profile');
-        } else {
-            showScreen('screen-profile');
-        }
+        showScreen('screen-profile');
     }
 
     function handleProfileNext() {
@@ -277,7 +313,6 @@
         }
     }
 
-    // オープンルーム一覧をサーバーから取得して表示
     function loadOpenRooms() {
         socket.emit('get-open-rooms', (rooms) => {
             const listContainer = document.getElementById('open-room-list');
@@ -335,7 +370,6 @@
     function startChat(displayName) {
         document.getElementById('room-id-display').innerText = displayName;
         
-        // オープンチャットの場合は「終了」ボタンを「退出」に変える（または隠す）
         const exitBtn = document.getElementById('exit-btn');
         if (myData.roomType === 'open') {
             exitBtn.innerText = "退出";
@@ -346,23 +380,44 @@
         }
 
         showScreen('screen-chat');
-        document.getElementById('chat-messages').innerHTML = ''; // 画面切り替え時にクリア
+        document.getElementById('chat-messages').innerHTML = '';
     }
 
+    // テキストメッセージ送信
     function sendMessage() {
         const input = document.getElementById('message-input');
-        if (!input.value.trim()) return;
+        const text = input.value.trim();
+        if (!text) return;
         playSound('pon');
         socket.emit('send-message', {
-            roomId: myData.roomId, nickname: myData.nickname, icon: myData.icon, text: input.value, senderId: socket.id
+            roomId: myData.roomId, nickname: myData.nickname, icon: myData.icon, text: text, type: 'text', senderId: socket.id
         });
         input.value = '';
         input.focus();
+        closeStampPicker();
+    }
+
+    // スタンプ送信
+    function sendStamp(stampEmoji) {
+        playSound('pon');
+        socket.emit('send-message', {
+            roomId: myData.roomId, nickname: myData.nickname, icon: myData.icon, text: stampEmoji, type: 'stamp', senderId: socket.id
+        });
+        closeStampPicker();
+    }
+
+    // スタンプピッカーの開閉
+    function toggleStampPicker() {
+        const picker = document.getElementById('stamp-picker');
+        picker.style.display = (picker.style.display === 'grid') ? 'none' : 'grid';
+    }
+
+    function closeStampPicker() {
+        document.getElementById('stamp-picker').style.display = 'none';
     }
 
     function exitAction() {
         if (myData.roomType === 'open') {
-            // オープンチャットなら単にリロードしてホームに戻る
             location.reload();
         } else {
             if (!myData.roomId) return location.reload();
@@ -371,7 +426,6 @@
         }
     }
 
-    // 簡易的なHTMLエスケープ
     function escapeHtml(str) {
         return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#039;');
     }
@@ -381,7 +435,16 @@
         const container = document.getElementById('chat-messages');
         const div = document.createElement('div');
         div.className = `msg ${data.senderId === socket.id ? 'me' : 'other'}`;
-        div.innerHTML = `<div style="font-size:10px;opacity:0.6">${data.icon} ${data.nickname}</div>${escapeHtml(data.text)}`;
+        
+        if (data.type === 'stamp') {
+            // スタンプの場合は大きく表示
+            div.classList.add('stamp-msg');
+            div.innerHTML = `<div style="font-size:10px;opacity:0.6;margin-bottom:2px;">${data.icon} ${data.nickname}</div>${escapeHtml(data.text)}`;
+        } else {
+            // 通常のテキストメッセージ
+            div.innerHTML = `<div style="font-size:10px;opacity:0.6">${data.icon} ${data.nickname}</div>${escapeHtml(data.text)}`;
+        }
+
         container.appendChild(div);
         container.scrollTop = container.scrollHeight;
     });
