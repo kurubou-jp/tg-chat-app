@@ -12,11 +12,11 @@ const rooms = {};
 
 // オープンチャット（常設ルーム）のプリセット定義
 const openRooms = {
-    'open-general': { name: '💬 雑談ルーム', type: 'open' },
-    'open-game': { name: '🎮 ゲーム部', type: 'open' },
-    'open-prog': { name: '💻 プログラミング・技術', type: 'open' },
-    'open-craft': { name: '🎨 工作・趣味', type: 'open' },
-    'open-music': { name: '🎵 音楽・ボカロ', type: 'open' }
+    'open-general': { name: '💬 ルーム１！', type: 'open' },
+    'open-game': { name: '💬 ルーム２！', type: 'open' },
+    'open-prog': { name: '💬 ルーム３！', type: 'open' },
+    'open-craft': { name: '💬 ルーム４！', type: 'open' },
+    'open-music': { name: '💬 ルーム５！', type: 'open' }
 };
 
 app.use(express.static(__dirname));
